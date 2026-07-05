@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Ntwaaban Map</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+<style>
+  html, body { height: 100%; margin: 0; font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+  #map { height: 100%; width: 100%; }
+
+  #topbar {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    z-index: 1000; background: #fff; padding: 8px 14px; border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25); font-size: 14px; font-weight: 600;
+    color: #1a1a1a; max-width: 80vw; text-align: center;
+  }
+  #topbar span { display: block; font-size: 11px; font-weight: 400; color: #666; margin-top: 2px; }
+
+  #controls {
+    position: absolute; bottom: 24px; right: 12px; z-index: 1000;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .ctrl-btn {
+    width: 48px; height: 48px; border-radius: 50%; border: none;
+    background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    font-size: 20px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .ctrl-btn:active { background: #eee; }
+
+  #navigateBtn {
+    position: absolute; bottom: 24px; left: 12px; z-index: 1000;
+    background: #1a73e8; color: #fff; border: none; border-radius: 24px;
+    padding: 12px 20px; font-size: 15px; font-weight: 600;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3); cursor: pointer;
+    display: none; align-items: center; gap: 6px;
+  }
+
+  #picker {
+    position: absolute; top: 60px; left: 50%; transform: translateX(-50%);
+    z-index: 1000; background: #fff; border-radius: 8px; padding: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25); font-size: 13px; display: none;
+  }
+  #picker select { border: none; font-size: 13px; padding: 4px; }
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div id="topbar">
+  <span id="areaName">Loading…</span>
+  <span id="areaSub"></span>
+</div>
+
+<div id="picker">
+  Jump to: <select id="areaSelect"><option value="">-- select --</option></select>
+</div>
+
+<div id="controls">
+  <button class="ctrl-btn" id="locateBtn" title="My Location">📍</button>
+  <button class="ctrl-btn" id="satelliteBtn" title="Toggle Satellite">🛰</button>
+  <button class="ctrl-btn" id="fullscreenBtn" title="Fullscreen">⛶</button>
+</div>
+
+<button id="navigateBtn">📌 Navigate</button>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+
+/* =========================================================
+   DATA
+   Replace this FeatureCollection with the GeoJSON exported
+   from QGIS. Each feature needs properties: id, name, description
+   (or whatever fields you want shown in the top bar).
+   ========================================================= */
+const ntwaabanData = {
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "id": "G4C", "name": "Ituma Washing Bay", "block": "Group 4C", "description": "This is along the Affram House" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [ -1.675471990702644, 5.006802594411085, 0.0 ], [ -1.674761374705028, 5.007111611234449, 0.0 ], [ -1.674774307733287, 5.007405265867723, 0.0 ], [ -1.674588944534506, 5.007764701888458, 0.0 ], [ -1.674262331993034, 5.008078583983313, 0.0 ], [ -1.674121028103435, 5.008129382019963, 0.0 ], [ -1.673887308896117, 5.008588505473033, 0.0 ], [ -1.6742861546139, 5.008868534918423, 0.0 ], [ -1.674499221012444, 5.008631698275553, 0.0 ], [ -1.674579139481167, 5.008378535557513, 0.0 ], [ -1.674598586058645, 5.008176934520816, 0.0 ], [ -1.674756334184597, 5.007990315124465, 0.0 ], [ -1.675273451833879, 5.007736576132871, 0.0 ], [ -1.675848325560501, 5.007541227392806, 0.0 ], [ -1.675729233104074, 5.007096593216144, 0.0 ], [ -1.675661780918857, 5.006792770753805, 0.0 ], [ -1.675471990702644, 5.006802594411085, 0.0 ]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "G4C", "name": "Behind Ituma Washing Bay", "block": "Block G4C", "description": "Ituma Estates" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [ -1.674062570112727, 5.003673564782011, 0.0 ], [ -1.672217835252269, 5.005310937006353, 0.0 ], [ -1.672585132662675, 5.005757917642374, 0.0 ], [ -1.672928038197712, 5.005419295083868, 0.0 ], [ -1.673606424937785, 5.004866228155683, 0.0 ], [ -1.673732838408206, 5.004711204854189, 0.0 ], [ -1.673987594040406, 5.004518594446162, 0.0 ], [ -1.674375197200474, 5.004135653373432, 0.0 ], [ -1.674352631865583, 5.003983727364476, 0.0 ], [ -1.674062570112727, 5.003673564782011, 0.0 ]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "B01", "name": "Area B01", "block": "Block B", "description": "Sample placeholder polygon" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-1.7500, 6.0060], [-1.7440, 6.0060], [-1.7440, 6.0095], [-1.7500, 6.0095], [-1.7500, 6.0060]
+        ]]
+      }
+    }
+  ]
+};
+
+/* ========================================================= */
+
+const map = L.map('map', { zoomControl: false }).setView([6.001, -1.747], 15);
+
+const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 20, attribution: '© OpenStreetMap contributors'
+}).addTo(map);
+
+const satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom: 20, attribution: 'Esri World Imagery'
+});
+
+let satelliteOn = false;
+
+const defaultStyle = { color: '#1a73e8', weight: 2, fillColor: '#1a73e8', fillOpacity: 0.15 };
+const highlightStyle = { color: '#ea4335', weight: 3, fillColor: '#ea4335', fillOpacity: 0.35 };
+
+const geoLayer = L.geoJSON(ntwaabanData, { style: defaultStyle }).addTo(map);
+
+let selectedLayer = null;
+let userMarker = null;
+let userLatLng = null;
+
+// populate the "jump to" picker
+const select = document.getElementById('areaSelect');
+ntwaabanData.features.forEach(f => {
+  const opt = document.createElement('option');
+  opt.value = f.properties.id;
+  opt.textContent = f.properties.name + ' (' + f.properties.id + ')';
+  select.appendChild(opt);
+});
+select.addEventListener('change', () => {
+  if (select.value) selectArea(select.value, true);
+});
+
+function findFeatureLayer(id) {
+  let found = null;
+  geoLayer.eachLayer(l => {
+    if (l.feature.properties.id === id) found = l;
+  });
+  return found;
+}
+
+function selectArea(id, updateUrl) {
+  if (selectedLayer) selectedLayer.setStyle(defaultStyle);
+
+  const layer = findFeatureLayer(id);
+  const nameEl = document.getElementById('areaName');
+  const subEl = document.getElementById('areaSub');
+  const navBtn = document.getElementById('navigateBtn');
+
+  if (!layer) {
+    nameEl.textContent = 'Area not found: ' + id;
+    subEl.textContent = '';
+    navBtn.style.display = 'none';
+    return;
+  }
+
+  layer.setStyle(highlightStyle);
+  selectedLayer = layer;
+  map.fitBounds(layer.getBounds(), { padding: [60, 60], maxZoom: 18 });
+
+  const p = layer.feature.properties;
+  nameEl.textContent = p.name || p.id;
+  subEl.textContent = [p.block, p.description].filter(Boolean).join(' · ');
+
+  navBtn.style.display = 'flex';
+  navBtn.onclick = () => navigateTo(layer);
+
+  if (updateUrl) {
+    const url = new URL(window.location);
+    url.searchParams.set('id', id);
+    window.history.replaceState({}, '', url);
+  }
+}
+
+// Distance from point p to segment a-b, and the closest point on that segment.
+// Uses simple planar approximation (fine at this scale, a few km).
+function closestPointOnSegment(p, a, b) {
+  const dx = b[0] - a[0], dy = b[1] - a[1];
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return { pt: a, dist: Math.hypot(p[0] - a[0], p[1] - a[1]) };
+  let t = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  const pt = [a[0] + t * dx, a[1] + t * dy];
+  return { pt, dist: Math.hypot(p[0] - pt[0], p[1] - pt[1]) };
+}
+
+// Finds the closest point on any ring/edge of the polygon to userLatLng.
+// Coordinates are [lng, lat] internally (GeoJSON order), returned as [lat, lng].
+function nearestPointOnPolygon(userLatLng, layer) {
+  const geom = layer.feature.geometry;
+  const rings = geom.type === 'Polygon' ? geom.coordinates : geom.coordinates.flat();
+  const p = [userLatLng[1], userLatLng[0]]; // to [lng, lat]
+
+  let best = null;
+  rings.forEach(ring => {
+    for (let i = 0; i < ring.length - 1; i++) {
+      const res = closestPointOnSegment(p, ring[i], ring[i + 1]);
+      if (!best || res.dist < best.dist) best = res;
+    }
+  });
+  return best ? [best.pt[1], best.pt[0]] : null; // back to [lat, lng]
+}
+
+let nearestMarker = null;
+
+function navigateTo(layer) {
+  let destination = layer.getBounds().getCenter();
+  let label = 'centre of the area';
+
+  if (userLatLng) {
+    const nearest = nearestPointOnPolygon(userLatLng, layer);
+    if (nearest) {
+      destination = { lat: nearest[0], lng: nearest[1] };
+      label = 'nearest boundary point';
+
+      if (nearestMarker) map.removeLayer(nearestMarker);
+      nearestMarker = L.circleMarker(nearest, {
+        radius: 7, color: '#fff', weight: 2, fillColor: '#fbbc04', fillOpacity: 1
+      }).addTo(map).bindPopup('Nearest point on boundary').openPopup();
+    }
+  }
+
+  document.getElementById('areaSub').textContent =
+    (label === 'nearest boundary point' ? '📌 Routing to nearest boundary point' : 'Routing to area centre — enable GPS for a closer point');
+
+  const url = 'https://www.google.com/maps/dir/?api=1&destination=' + destination.lat + ',' + destination.lng;
+  window.open(url, '_blank');
+}
+
+// --- GPS ---
+document.getElementById('locateBtn').addEventListener('click', () => {
+  if (!navigator.geolocation) {
+    alert('Geolocation not supported on this device/browser.');
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(pos => {
+    userLatLng = [pos.coords.latitude, pos.coords.longitude];
+    if (userMarker) map.removeLayer(userMarker);
+    userMarker = L.circleMarker(userLatLng, {
+      radius: 8, color: '#fff', weight: 2, fillColor: '#4285f4', fillOpacity: 1
+    }).addTo(map).bindPopup('You are here');
+
+    if (selectedLayer) {
+      // an area is already selected — refresh the nearest-point marker, stay zoomed on the polygon
+      const nearest = nearestPointOnPolygon(userLatLng, selectedLayer);
+      if (nearest) {
+        if (nearestMarker) map.removeLayer(nearestMarker);
+        nearestMarker = L.circleMarker(nearest, {
+          radius: 7, color: '#fff', weight: 2, fillColor: '#fbbc04', fillOpacity: 1
+        }).addTo(map);
+      }
+    } else {
+      map.setView(userLatLng, 17);
+    }
+  }, err => {
+    alert('Could not get location: ' + err.message);
+  }, { enableHighAccuracy: true });
+});
+
+// --- Satellite toggle ---
+document.getElementById('satelliteBtn').addEventListener('click', () => {
+  satelliteOn = !satelliteOn;
+  if (satelliteOn) {
+    map.removeLayer(streetLayer);
+    satLayer.addTo(map);
+  } else {
+    map.removeLayer(satLayer);
+    streetLayer.addTo(map);
+  }
+});
+
+// --- Fullscreen ---
+document.getElementById('fullscreenBtn').addEventListener('click', () => {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(() => {});
+  } else {
+    document.exitFullscreen();
+  }
+});
+
+// --- read ?id= from URL on load ---
+const params = new URLSearchParams(window.location.search);
+const requestedId = params.get('id');
+
+if (requestedId) {
+  selectArea(requestedId, false);
+  document.getElementById('picker').style.display = 'none';
+} else {
+  document.getElementById('areaName').textContent = 'Ntwaaban';
+  document.getElementById('areaSub').textContent = 'Select an area or open a direct link';
+  document.getElementById('picker').style.display = 'block';
+  map.fitBounds(geoLayer.getBounds(), { padding: [40, 40] });
+}
+
+</script>
+</body>
+</html>
