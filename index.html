@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Ntwaaban Map</title>
+<title>Inchaban Eng</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
 <style>
   html, body { height: 100%; margin: 0; font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
@@ -431,8 +431,8 @@ const requestedId = params.get('id');
 if (requestedId) {
   selectArea(requestedId, false);
 } else {
-  document.getElementById('areaName').textContent = 'Ntwaaban';
-  document.getElementById('areaSub').textContent = 'Tap to choose an area';
+  document.getElementById('areaName').textContent = 'Territory';
+  document.getElementById('areaSub').textContent = 'Tap to choose you territory';
   map.fitBounds(geoLayer.getBounds(), { padding: [40, 40] });
 }
 
