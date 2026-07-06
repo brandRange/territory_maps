@@ -11,11 +11,38 @@
 
   #topbar {
     position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-    z-index: 1000; background: #fff; padding: 8px 14px; border-radius: 10px;
+    z-index: 1000; background: #fff; padding: 8px 16px; border-radius: 10px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.25); font-size: 14px; font-weight: 600;
-    color: #1a1a1a; max-width: 80vw; text-align: center;
+    color: #1a1a1a; max-width: 82vw; text-align: center; cursor: pointer;
+    display: flex; align-items: center; gap: 8px; user-select: none;
   }
-  #topbar span { display: block; font-size: 11px; font-weight: 400; color: #666; margin-top: 2px; }
+  #topbar .txt { display: flex; flex-direction: column; }
+  #topbar span.sub { font-size: 11px; font-weight: 400; color: #666; margin-top: 2px; }
+  #topbar .chev { font-size: 10px; color: #999; transition: transform 0.2s; }
+  #topbar.open .chev { transform: rotate(180deg); }
+
+  #areaPanel {
+    position: absolute; top: 56px; left: 50%; transform: translateX(-50%);
+    z-index: 999; background: #fff; border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3); width: min(320px, 86vw);
+    max-height: 0; overflow: hidden; transition: max-height 0.2s ease;
+  }
+  #areaPanel.open { max-height: 320px; }
+  #areaPanel .inner { padding: 10px; }
+  #areaSearch {
+    width: 100%; box-sizing: border-box; padding: 8px 10px; font-size: 14px;
+    border: 1px solid #ddd; border-radius: 8px; margin-bottom: 8px;
+  }
+  #areaList { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+  .area-item {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+    border-radius: 8px; cursor: pointer; font-size: 13px; text-align: left;
+    border: none; background: #f5f5f5; width: 100%;
+  }
+  .area-item:active { background: #e8e8e8; }
+  .area-item .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .area-item .name { color: #444; font-weight: 400; }
+  .area-item b { color: #1a1a1a; }
 
   #controls {
     position: absolute; bottom: 24px; right: 12px; z-index: 1000;
@@ -28,6 +55,7 @@
     cursor: pointer;
   }
   .ctrl-btn:active { background: #eee; }
+  .ctrl-btn.active { background: #1a73e8; color: #fff; }
 
   #navigateBtn {
     position: absolute; bottom: 24px; left: 12px; z-index: 1000;
@@ -37,12 +65,12 @@
     display: none; align-items: center; gap: 6px;
   }
 
-  #picker {
-    position: absolute; top: 60px; left: 50%; transform: translateX(-50%);
-    z-index: 1000; background: #fff; border-radius: 8px; padding: 6px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.25); font-size: 13px; display: none;
+  .area-label {
+    background: transparent; border: none; box-shadow: none;
+    font-weight: 700; font-size: 11px; color: #fff;
+    text-shadow: 0 0 3px rgba(0,0,0,0.9), 0 0 3px rgba(0,0,0,0.9);
   }
-  #picker select { border: none; font-size: 13px; padding: 4px; }
+  .area-label::before { display: none; }
 </style>
 </head>
 <body>
@@ -50,17 +78,23 @@
 <div id="map"></div>
 
 <div id="topbar">
-  <span id="areaName">Loading…</span>
-  <span id="areaSub"></span>
+  <div class="txt">
+    <span id="areaName">Loading…</span>
+    <span id="areaSub" class="sub"></span>
+  </div>
+  <span class="chev">▾</span>
 </div>
 
-<div id="picker">
-  Jump to: <select id="areaSelect"><option value="">-- select --</option></select>
+<div id="areaPanel">
+  <div class="inner">
+    <input id="areaSearch" type="text" placeholder="Search areas…" />
+    <div id="areaList"></div>
+  </div>
 </div>
 
 <div id="controls">
   <button class="ctrl-btn" id="locateBtn" title="My Location">📍</button>
-  <button class="ctrl-btn" id="satelliteBtn" title="Toggle Satellite">🛰</button>
+  <button class="ctrl-btn" id="satelliteBtn" title="Toggle Basemap">🗺</button>
   <button class="ctrl-btn" id="fullscreenBtn" title="Fullscreen">⛶</button>
 </div>
 
@@ -69,130 +103,183 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <script>
 
-/* =========================================================
-   DATA
-   Replace this FeatureCollection with the GeoJSON exported
-   from QGIS. Each feature needs properties: id, name, description
-   (or whatever fields you want shown in the top bar).
-   ========================================================= */
 const ntwaabanData = {
   "type": "FeatureCollection",
   "features": [
-  {
+    {
       "type": "Feature",
       "properties": { "id": "G4A", "name": "Behind Washing Bay", "block": "Block A", "description": "Behind washing bay" },
-      "geometry": {
-        "type": "Polygon",
-        "coordinates": [[
-          [ -1.674062570112727, 5.003673564782011, 0.0 ], [ -1.672217835252269, 5.005310937006353, 0.0 ], [ -1.672585132662675, 5.005757917642374, 0.0 ], [ -1.672928038197712, 5.005419295083868, 0.0 ], [ -1.673606424937785, 5.004866228155683, 0.0 ], [ -1.673732838408206, 5.004711204854189, 0.0 ], [ -1.673987594040406, 5.004518594446162, 0.0 ], [ -1.674375197200474, 5.004135653373432, 0.0 ], [ -1.674352631865583, 5.003983727364476, 0.0 ], [ -1.674062570112727, 5.003673564782011, 0.0 ]
-        ]]
-      }
+      "geometry": { "type": "Polygon", "coordinates": [[
+        [ -1.674062570112727, 5.003673564782011, 0.0 ], [ -1.672217835252269, 5.005310937006353, 0.0 ], [ -1.672585132662675, 5.005757917642374, 0.0 ], [ -1.672928038197712, 5.005419295083868, 0.0 ], [ -1.673606424937785, 5.004866228155683, 0.0 ], [ -1.673732838408206, 5.004711204854189, 0.0 ], [ -1.673987594040406, 5.004518594446162, 0.0 ], [ -1.674375197200474, 5.004135653373432, 0.0 ], [ -1.674352631865583, 5.003983727364476, 0.0 ], [ -1.674062570112727, 5.003673564782011, 0.0 ]
+      ]] }
     },
-
     {
       "type": "Feature",
       "properties": { "id": "G4B", "name": "Behind Washing Bay", "block": "Block B", "description": "Behind washing bay" },
-      "geometry": {
-        "type": "Polygon",
-        "coordinates": [[
-          [ -1.675738332171254, 5.007007764421287, 0.0 ], [ -1.675952267529243, 5.006551474371892, 0.0 ], [ -1.675915759085694, 5.006142184333534, 0.0 ], [ -1.675299320944592, 5.005522659067815, 0.0 ], [ -1.674634522252726, 5.00472448920222, 0.0 ], [ -1.674225348490503, 5.004274295258497, 0.0 ], [ -1.673745865425791, 5.004734374447901, 0.0 ], [ -1.675738332171254, 5.007007764421287, 0.0 ]
-        ]]
-      }
+      "geometry": { "type": "Polygon", "coordinates": [[
+        [ -1.675738332171254, 5.007007764421287, 0.0 ], [ -1.675952267529243, 5.006551474371892, 0.0 ], [ -1.675915759085694, 5.006142184333534, 0.0 ], [ -1.675299320944592, 5.005522659067815, 0.0 ], [ -1.674634522252726, 5.00472448920222, 0.0 ], [ -1.674225348490503, 5.004274295258497, 0.0 ], [ -1.673745865425791, 5.004734374447901, 0.0 ], [ -1.675738332171254, 5.007007764421287, 0.0 ]
+      ]] }
     },
-
     {
       "type": "Feature",
       "properties": { "id": "G4C", "name": "Inside estate", "block": "Block C", "description": "Estate after hill" },
-      "geometry": {
-        "type": "Polygon",
-        "coordinates": [[
-          [ -1.67694007491566, 5.007839398137614, 0.0 ], [ -1.677002109508413, 5.007397850021004, 0.0 ], [ -1.676753393559947, 5.007189885844542, 0.0 ], [ -1.676360168132127, 5.007080159752377, 0.0 ], [ -1.676264787325284, 5.007649868769075, 0.0 ], [ -1.676157514498513, 5.007920792117355, 0.0 ], [ -1.67595691237544, 5.008519102941964, 0.0 ], [ -1.676704499680601, 5.008751584628344, 0.0 ], [ -1.67694007491566, 5.007839398137614, 0.0 ]
-        ]]
-      }
+      "geometry": { "type": "Polygon", "coordinates": [[
+        [ -1.67694007491566, 5.007839398137614, 0.0 ], [ -1.677002109508413, 5.007397850021004, 0.0 ], [ -1.676753393559947, 5.007189885844542, 0.0 ], [ -1.676360168132127, 5.007080159752377, 0.0 ], [ -1.676264787325284, 5.007649868769075, 0.0 ], [ -1.676157514498513, 5.007920792117355, 0.0 ], [ -1.67595691237544, 5.008519102941964, 0.0 ], [ -1.676704499680601, 5.008751584628344, 0.0 ], [ -1.67694007491566, 5.007839398137614, 0.0 ]
+      ]] }
     },
-
-
-  {
+    {
       "type": "Feature",
       "properties": { "id": "G4D", "name": "Ituma Estates", "block": "Block D", "description": "Hill after Estates" },
-      "geometry": {
-        "type": "Polygon",
-        "coordinates": [[
-          [ -1.675471990702644, 5.006802594411085, 0.0 ], [ -1.674761374705028, 5.007111611234449, 0.0 ], [ -1.674774307733287, 5.007405265867723, 0.0 ], [ -1.674588944534506, 5.007764701888458, 0.0 ], [ -1.674262331993034, 5.008078583983313, 0.0 ], [ -1.674121028103435, 5.008129382019963, 0.0 ], [ -1.673887308896117, 5.008588505473033, 0.0 ], [ -1.6742861546139, 5.008868534918423, 0.0 ], [ -1.674499221012444, 5.008631698275553, 0.0 ], [ -1.674579139481167, 5.008378535557513, 0.0 ], [ -1.674598586058645, 5.008176934520816, 0.0 ], [ -1.674756334184597, 5.007990315124465, 0.0 ], [ -1.675273451833879, 5.007736576132871, 0.0 ], [ -1.675848325560501, 5.007541227392806, 0.0 ], [ -1.675729233104074, 5.007096593216144, 0.0 ], [ -1.675661780918857, 5.006792770753805, 0.0 ], [ -1.675471990702644, 5.006802594411085, 0.0 ]
-        ]]
-      }
+      "geometry": { "type": "Polygon", "coordinates": [[
+        [ -1.675471990702644, 5.006802594411085, 0.0 ], [ -1.674761374705028, 5.007111611234449, 0.0 ], [ -1.674774307733287, 5.007405265867723, 0.0 ], [ -1.674588944534506, 5.007764701888458, 0.0 ], [ -1.674262331993034, 5.008078583983313, 0.0 ], [ -1.674121028103435, 5.008129382019963, 0.0 ], [ -1.673887308896117, 5.008588505473033, 0.0 ], [ -1.6742861546139, 5.008868534918423, 0.0 ], [ -1.674499221012444, 5.008631698275553, 0.0 ], [ -1.674579139481167, 5.008378535557513, 0.0 ], [ -1.674598586058645, 5.008176934520816, 0.0 ], [ -1.674756334184597, 5.007990315124465, 0.0 ], [ -1.675273451833879, 5.007736576132871, 0.0 ], [ -1.675848325560501, 5.007541227392806, 0.0 ], [ -1.675729233104074, 5.007096593216144, 0.0 ], [ -1.675661780918857, 5.006792770753805, 0.0 ], [ -1.675471990702644, 5.006802594411085, 0.0 ]
+      ]] }
     },
-
     {
       "type": "Feature",
       "properties": { "id": "G4E", "name": "Ituma Estates", "block": "Block D", "description": "Hill after Estates" },
-      "geometry": {
-        "type": "Polygon",
-        "coordinates": [[
-          [ -1.676449940624237, 5.009907373943977, 0.0 ], [ -1.676861825069977, 5.008933982306213, 0.0 ], [ -1.675947508228239, 5.008540649128843, 0.0 ], [ -1.675971772609014, 5.00824071807042, 0.0 ], [ -1.675261561379118, 5.008143570386919, 0.0 ], [ -1.674838495668014, 5.008300668230341, 0.0 ], [ -1.674691693879968, 5.009439222504015, 0.0 ], [ -1.676449940624237, 5.009907373943977, 0.0 ]
-        ]]
-      }
+      "geometry": { "type": "Polygon", "coordinates": [[
+        [ -1.676449940624237, 5.009907373943977, 0.0 ], [ -1.676861825069977, 5.008933982306213, 0.0 ], [ -1.675947508228239, 5.008540649128843, 0.0 ], [ -1.675971772609014, 5.00824071807042, 0.0 ], [ -1.675261561379118, 5.008143570386919, 0.0 ], [ -1.674838495668014, 5.008300668230341, 0.0 ], [ -1.674691693879968, 5.009439222504015, 0.0 ], [ -1.676449940624237, 5.009907373943977, 0.0 ]
+      ]] }
     },
-
-    
     {
       "type": "Feature",
       "properties": { "id": "KH", "name": "KINGDOM HALL", "block": "Block KH", "description": "Kingdom Hall" },
-      "geometry": {
-        "type": "Polygon",
-        "coordinates": [[
-          [ -1.677304621349041, 5.001257232164877, 0.0 ], [ -1.677421339456939, 5.001130277851473, 0.0 ], [ -1.677181591857776, 5.000885677097554, 0.0 ], [ -1.677040606186718, 5.001007391928852, 0.0 ], [ -1.677292473990811, 5.001257440395282, 0.0 ], [ -1.677304621349041, 5.001257232164877, 0.0 ]
-        ]]
-      }
+      "geometry": { "type": "Polygon", "coordinates": [[
+        [ -1.677304621349041, 5.001257232164877, 0.0 ], [ -1.677421339456939, 5.001130277851473, 0.0 ], [ -1.677181591857776, 5.000885677097554, 0.0 ], [ -1.677040606186718, 5.001007391928852, 0.0 ], [ -1.677292473990811, 5.001257440395282, 0.0 ], [ -1.677304621349041, 5.001257232164877, 0.0 ]
+      ]] }
     }
   ]
 };
 
-/* ========================================================= */
-
 const map = L.map('map', { zoomControl: false }).setView([6.001, -1.747], 15);
 
 const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 22,maxNativeZoom: 19, attribution: '© OpenStreetMap contributors'
-}).addTo(map);
+  maxZoom: 22, maxNativeZoom: 19, attribution: '© OpenStreetMap contributors'
+});
 
 const satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
   maxZoom: 22, maxNativeZoom: 18, attribution: 'Esri World Imagery'
 });
 
-let satelliteOn = false;
+// Default basemap is now satellite.
+let satelliteOn = true;
+satLayer.addTo(map);
+document.getElementById('satelliteBtn').textContent = '🗺'; // shows the OTHER option you can switch to
 
-const defaultStyle = { color: '#1a73e8', weight: 2, fillColor: '#1a73e8', fillOpacity: 0.15 };
-const highlightStyle = { color: '#ea4335', weight: 3, fillColor: '#ea4335', fillOpacity: 0.35 };
+// --- Colour by block ---
+const blockColors = {
+  'Block A': '#1a73e8',
+  'Block B': '#34a853',
+  'Block C': '#fbbc04',
+  'Block D': '#a142f4',
+  'Block KH': '#ea4335'
+};
+function styleForBlock(block) {
+  const c = blockColors[block] || '#1a73e8';
+  return { color: c, weight: 2, fillColor: c, fillOpacity: 0.18 };
+}
+const highlightStyle = { color: '#ff3d00', weight: 3, fillColor: '#ff3d00', fillOpacity: 0.35 };
 
-const geoLayer = L.geoJSON(ntwaabanData, { style: defaultStyle }).addTo(map);
+const geoLayer = L.geoJSON(ntwaabanData, {
+  style: f => styleForBlock(f.properties.block)
+}).addTo(map);
+
+// --- Zoom-dependent permanent labels ---
+geoLayer.eachLayer(l => {
+  l.bindTooltip(l.feature.properties.id, {
+    permanent: true, direction: 'center', className: 'area-label'
+  });
+});
+function updateLabelVisibility() {
+  const show = map.getZoom() >= 17;
+  geoLayer.eachLayer(l => { show ? l.openTooltip() : l.closeTooltip(); });
+}
+map.on('zoomend', updateLabelVisibility);
+updateLabelVisibility();
 
 let selectedLayer = null;
 let userMarker = null;
 let userLatLng = null;
+let nearestMarker = null;
+let watchId = null;
+let lastDistanceMeters = null;
 
-// populate the "jump to" picker
-const select = document.getElementById('areaSelect');
-ntwaabanData.features.forEach(f => {
-  const opt = document.createElement('option');
-  opt.value = f.properties.id;
-  opt.textContent = f.properties.id + ' (' + f.properties.name + ')';
-  select.appendChild(opt);
-});
-select.addEventListener('change', () => {
-  if (select.value) selectArea(select.value, true);
+// --- Area switcher panel ---
+const topbar = document.getElementById('topbar');
+const areaPanel = document.getElementById('areaPanel');
+const areaList = document.getElementById('areaList');
+const areaSearch = document.getElementById('areaSearch');
+
+function renderAreaList(filter) {
+  areaList.innerHTML = '';
+  const q = (filter || '').toLowerCase();
+  ntwaabanData.features
+    .filter(f => !q || f.properties.id.toLowerCase().includes(q) || f.properties.name.toLowerCase().includes(q))
+    .forEach(f => {
+      const btn = document.createElement('button');
+      btn.className = 'area-item';
+      const dot = document.createElement('span');
+      dot.className = 'dot';
+      dot.style.background = (blockColors[f.properties.block] || '#1a73e8');
+      const label = document.createElement('span');
+      label.className = 'name';
+      label.innerHTML = '<b>' + f.properties.id + '</b> — ' + f.properties.name;
+      btn.appendChild(dot);
+      btn.appendChild(label);
+      btn.addEventListener('click', () => {
+        selectArea(f.properties.id, true);
+        closePanel();
+      });
+      areaList.appendChild(btn);
+    });
+}
+renderAreaList('');
+areaSearch.addEventListener('input', () => renderAreaList(areaSearch.value));
+
+function openPanel() {
+  areaPanel.classList.add('open');
+  topbar.classList.add('open');
+  areaSearch.value = '';
+  renderAreaList('');
+  setTimeout(() => areaSearch.focus(), 150);
+}
+function closePanel() {
+  areaPanel.classList.remove('open');
+  topbar.classList.remove('open');
+}
+topbar.addEventListener('click', () => {
+  areaPanel.classList.contains('open') ? closePanel() : openPanel();
 });
 
 function findFeatureLayer(id) {
   let found = null;
-  geoLayer.eachLayer(l => {
-    if (l.feature.properties.id === id) found = l;
-  });
+  geoLayer.eachLayer(l => { if (l.feature.properties.id === id) found = l; });
   return found;
 }
 
+function haversineMeters(a, b) {
+  const R = 6371000;
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(b[0] - a[0]);
+  const dLng = toRad(b[1] - a[1]);
+  const s = Math.sin(dLat / 2) ** 2 +
+            Math.cos(toRad(a[0])) * Math.cos(toRad(b[0])) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+function formatDistance(m) {
+  return m < 1000 ? Math.round(m) + 'm' : (m / 1000).toFixed(2) + 'km';
+}
+
+function updateSubtitle() {
+  if (!selectedLayer) return;
+  const p = selectedLayer.feature.properties;
+  const parts = [p.block, p.description].filter(Boolean);
+  if (lastDistanceMeters !== null) parts.push(formatDistance(lastDistanceMeters) + ' to boundary');
+  document.getElementById('areaSub').textContent = parts.join(' · ');
+}
+
 function selectArea(id, updateUrl) {
-  if (selectedLayer) selectedLayer.setStyle(defaultStyle);
+  if (selectedLayer) selectedLayer.setStyle(styleForBlock(selectedLayer.feature.properties.block));
 
   const layer = findFeatureLayer(id);
   const nameEl = document.getElementById('areaName');
@@ -208,11 +295,23 @@ function selectArea(id, updateUrl) {
 
   layer.setStyle(highlightStyle);
   selectedLayer = layer;
+  lastDistanceMeters = null;
   map.fitBounds(layer.getBounds(), { padding: [60, 60], maxZoom: 18 });
 
   const p = layer.feature.properties;
   nameEl.textContent = p.name || p.id;
-  subEl.textContent = [p.block, p.description].filter(Boolean).join(' · ');
+
+  if (userLatLng) {
+    const nearest = nearestPointOnPolygon(userLatLng, layer);
+    if (nearest) {
+      lastDistanceMeters = haversineMeters(userLatLng, nearest);
+      if (nearestMarker) map.removeLayer(nearestMarker);
+      nearestMarker = L.circleMarker(nearest, {
+        radius: 7, color: '#fff', weight: 2, fillColor: '#fbbc04', fillOpacity: 1
+      }).addTo(map);
+    }
+  }
+  updateSubtitle();
 
   navBtn.style.display = 'flex';
   navBtn.onclick = () => navigateTo(layer);
@@ -224,8 +323,6 @@ function selectArea(id, updateUrl) {
   }
 }
 
-// Distance from point p to segment a-b, and the closest point on that segment.
-// Uses simple planar approximation (fine at this scale, a few km).
 function closestPointOnSegment(p, a, b) {
   const dx = b[0] - a[0], dy = b[1] - a[1];
   const lenSq = dx * dx + dy * dy;
@@ -236,12 +333,10 @@ function closestPointOnSegment(p, a, b) {
   return { pt, dist: Math.hypot(p[0] - pt[0], p[1] - pt[1]) };
 }
 
-// Finds the closest point on any ring/edge of the polygon to userLatLng.
-// Coordinates are [lng, lat] internally (GeoJSON order), returned as [lat, lng].
 function nearestPointOnPolygon(userLatLng, layer) {
   const geom = layer.feature.geometry;
   const rings = geom.type === 'Polygon' ? geom.coordinates : geom.coordinates.flat();
-  const p = [userLatLng[1], userLatLng[0]]; // to [lng, lat]
+  const p = [userLatLng[1], userLatLng[0]];
 
   let best = null;
   rings.forEach(ring => {
@@ -250,78 +345,78 @@ function nearestPointOnPolygon(userLatLng, layer) {
       if (!best || res.dist < best.dist) best = res;
     }
   });
-  return best ? [best.pt[1], best.pt[0]] : null; // back to [lat, lng]
+  return best ? [best.pt[1], best.pt[0]] : null;
 }
-
-let nearestMarker = null;
 
 function navigateTo(layer) {
   let destination = layer.getBounds().getCenter();
-  let label = 'centre of the area';
 
   if (userLatLng) {
     const nearest = nearestPointOnPolygon(userLatLng, layer);
-    if (nearest) {
-      destination = { lat: nearest[0], lng: nearest[1] };
-      label = 'nearest boundary point';
-
-      if (nearestMarker) map.removeLayer(nearestMarker);
-      nearestMarker = L.circleMarker(nearest, {
-        radius: 7, color: '#fff', weight: 2, fillColor: '#fbbc04', fillOpacity: 1
-      }).addTo(map).bindPopup('Nearest point on boundary').openPopup();
-    }
+    if (nearest) destination = { lat: nearest[0], lng: nearest[1] };
   }
-
-  document.getElementById('areaSub').textContent =
-    (label === 'nearest boundary point' ? '📌 Routing to nearest boundary point' : 'Routing to area centre — enable GPS for a closer point');
 
   const url = 'https://www.google.com/maps/dir/?api=1&destination=' + destination.lat + ',' + destination.lng;
   window.open(url, '_blank');
 }
 
-// --- GPS ---
+// --- Live GPS tracking (toggle on/off) ---
+function onPosition(pos) {
+  const first = (userLatLng === null);
+  userLatLng = [pos.coords.latitude, pos.coords.longitude];
+
+  if (userMarker) map.removeLayer(userMarker);
+  userMarker = L.circleMarker(userLatLng, {
+    radius: 8, color: '#fff', weight: 2, fillColor: '#4285f4', fillOpacity: 1
+  }).addTo(map);
+
+  if (selectedLayer) {
+    const nearest = nearestPointOnPolygon(userLatLng, selectedLayer);
+    if (nearest) {
+      lastDistanceMeters = haversineMeters(userLatLng, nearest);
+      if (nearestMarker) map.removeLayer(nearestMarker);
+      nearestMarker = L.circleMarker(nearest, {
+        radius: 7, color: '#fff', weight: 2, fillColor: '#fbbc04', fillOpacity: 1
+      }).addTo(map);
+      updateSubtitle();
+    }
+  } else if (first) {
+    map.setView(userLatLng, 17);
+  }
+}
+
 document.getElementById('locateBtn').addEventListener('click', () => {
+  const btn = document.getElementById('locateBtn');
   if (!navigator.geolocation) {
     alert('Geolocation not supported on this device/browser.');
     return;
   }
-  navigator.geolocation.getCurrentPosition(pos => {
-    userLatLng = [pos.coords.latitude, pos.coords.longitude];
-    if (userMarker) map.removeLayer(userMarker);
-    userMarker = L.circleMarker(userLatLng, {
-      radius: 8, color: '#fff', weight: 2, fillColor: '#4285f4', fillOpacity: 1
-    }).addTo(map).bindPopup('You are here');
-
-    if (selectedLayer) {
-      // an area is already selected — refresh the nearest-point marker, stay zoomed on the polygon
-      const nearest = nearestPointOnPolygon(userLatLng, selectedLayer);
-      if (nearest) {
-        if (nearestMarker) map.removeLayer(nearestMarker);
-        nearestMarker = L.circleMarker(nearest, {
-          radius: 7, color: '#fff', weight: 2, fillColor: '#fbbc04', fillOpacity: 1
-        }).addTo(map);
-      }
-    } else {
-      map.setView(userLatLng, 17);
-    }
-  }, err => {
-    alert('Could not get location: ' + err.message);
-  }, { enableHighAccuracy: true });
+  if (watchId === null) {
+    watchId = navigator.geolocation.watchPosition(onPosition, err => {
+      alert('Could not get location: ' + err.message);
+    }, { enableHighAccuracy: true, maximumAge: 2000, timeout: 15000 });
+    btn.classList.add('active');
+  } else {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+    btn.classList.remove('active');
+  }
 });
 
-// --- Satellite toggle ---
+// --- Basemap toggle ---
 document.getElementById('satelliteBtn').addEventListener('click', () => {
   satelliteOn = !satelliteOn;
   if (satelliteOn) {
     map.removeLayer(streetLayer);
     satLayer.addTo(map);
+    document.getElementById('satelliteBtn').textContent = '🗺';
   } else {
     map.removeLayer(satLayer);
     streetLayer.addTo(map);
+    document.getElementById('satelliteBtn').textContent = '🛰';
   }
 });
 
-// --- Fullscreen ---
 document.getElementById('fullscreenBtn').addEventListener('click', () => {
   if (!document.fullscreenElement) {
     document.documentElement.requestFullscreen().catch(() => {});
@@ -330,19 +425,16 @@ document.getElementById('fullscreenBtn').addEventListener('click', () => {
   }
 });
 
-// --- read ?id= from URL on load ---
 const params = new URLSearchParams(window.location.search);
 const requestedId = params.get('id');
 
 if (requestedId) {
   selectArea(requestedId, false);
-  select.value = requestedId;
 } else {
   document.getElementById('areaName').textContent = 'Ntwaaban';
-  document.getElementById('areaSub').textContent = 'Select an area or open a direct link';
+  document.getElementById('areaSub').textContent = 'Tap to choose an area';
   map.fitBounds(geoLayer.getBounds(), { padding: [40, 40] });
 }
-document.getElementById('picker').style.display = 'block';
 
 </script>
 </body>
