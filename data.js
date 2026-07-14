@@ -78,7 +78,7 @@ const ntwaabanData = {
       ]] }
     },
 
-      {
+    {
       "type": "Feature",
       "properties": { "id": "G5E", "name": "Abi's Enclave", "block": "Block E", "description": "Opp of Hotel to Mt Zion" },
       "geometry": { "type": "Polygon", "coordinates": [[
@@ -89,6 +89,12 @@ const ntwaabanData = {
     
 
     // ------------------------------------KH--------------------------------------------------
-  
+  {
+      "type": "Feature",
+      "properties": { "id": "KH", "name": "KINGDOM HALL", "block": "Block KH", "description": "Kingdom Hall" },
+      "geometry": { "type": "Polygon", "coordinates": [[
+        [ -1.677304621349041, 5.001257232164877, 0.0 ], [ -1.677421339456939, 5.001130277851473, 0.0 ], [ -1.677181591857776, 5.000885677097554, 0.0 ], [ -1.677040606186718, 5.001007391928852, 0.0 ], [ -1.677292473990811, 5.001257440395282, 0.0 ], [ -1.677304621349041, 5.001257232164877, 0.0 ]
+      ]] }
+    }
   ]
 };
