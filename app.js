@@ -48,7 +48,7 @@ function styleForBlock(block) {
   const c = blockColors[block] || '#1a73e8';
   return { color: c, weight: 3, fillOpacity: 0 }; // outline-only until selected
 }
-const highlightStyle = { color: '#ff3d00', weight: 3, fillColor: '#ff3d00', fillOpacity: 0.28 };
+const highlightStyle = { color: '#ff3d00', weight: 3, fillColor: '#da9a87', fillOpacity: 0.28 };
 
 const geoLayer = L.geoJSON(dataToLoad, {
   style: f => styleForBlock(f.properties.block)
