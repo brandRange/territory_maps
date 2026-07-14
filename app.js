@@ -36,19 +36,35 @@ let satelliteOn = true;
 satLayer.addTo(map);
 document.getElementById('satelliteBtn').textContent = '🗺'; // shows the OTHER option you can switch to
 
-// --- Colour by block ---
-const blockColors = {
-  'Block A': '#1a73e8',
-  'Block B': '#34a853',
-  'Block C': '#fbbc04',
-  'Block D': '#a142f4',
-  'Block KH': '#ea4335'
-};
+// --- Colour by block, generated automatically ---
+// Instead of a hand-maintained map (which doesn't scale past a handful of
+// blocks), each block gets a hue spaced by the golden angle (~137.5°).
+// This is the standard trick for generating a sequence of colors that stay
+// visually distinct from each other, however many you end up needing —
+// works the same whether you have 6 blocks or 100.
+// Colors are assigned in the order each block first appears in the data,
+// so adding new blocks at the end of data.js never changes existing ones.
+function buildBlockColors(data) {
+  const GOLDEN_ANGLE = 137.508;
+  const map = {};
+  let i = 0;
+  data.features.forEach(f => {
+    const block = f.properties.block || 'Unassigned';
+    if (!(block in map)) {
+      const hue = (i * GOLDEN_ANGLE) % 360;
+      map[block] = `hsl(${hue.toFixed(1)}, 68%, 45%)`;
+      i++;
+    }
+  });
+  return map;
+}
+const blockColors = buildBlockColors(ntwaabanData); // built from the full dataset, so
+                                                      // colors stay stable even in restricted mode
 function styleForBlock(block) {
   const c = blockColors[block] || '#1a73e8';
   return { color: c, weight: 3, fillOpacity: 0 }; // outline-only until selected
 }
-const highlightStyle = { color: '#ff3d00', weight: 3, fillColor: '#da9a87', fillOpacity: 0.28 };
+const highlightStyle = { color: '#ff3d00', weight: 3, fillColor: '#ff3d00', fillOpacity: 0.28 };
 
 const geoLayer = L.geoJSON(dataToLoad, {
   style: f => styleForBlock(f.properties.block)
